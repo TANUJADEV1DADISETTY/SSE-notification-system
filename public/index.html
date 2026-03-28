@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>SSE Notification Demo</title>
+  <style>
+    body { font-family: sans-serif; background-color: #f4f4f9; color: #333; margin: 0; padding: 20px; }
+    .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    h1 { margin-top: 0; color: #2c3e50; }
+    .control-group { display: flex; gap: 10px; margin-bottom: 20px; }
+    input { padding: 8px; border: 1px solid #ccc; border-radius: 4px; flex: 1; }
+    button { padding: 8px 16px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; }
+    button:hover { background: #2980b9; }
+    .log-window { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; height: 300px; overflow-y: auto; font-family: monospace; }
+    .event { margin-bottom: 8px; border-bottom: 1px dashed #444; padding-bottom: 8px; }
+    .event-type { color: #569cd6; font-weight: bold; }
+    .event-id { color: #b5cea8; }
+    .event-data { color: #ce9178; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>SSE Notification System Demo</h1>
+    
+    <div class="control-group">
+      <input type="text" id="channel" value="alerts" placeholder="Channel">
+      <input type="text" id="eventType" value="CUSTOM_ALERT" placeholder="Type">
+      <input type="text" id="message" value="Hello real-time world!" placeholder="Payload Message">
+      <button onclick="publishEvent()">Publish Event</button>
+    </div>
+
+    <h3>Live Stream (<span id="status">Connecting...</span>)</h3>
+    <div class="log-window" id="logs"></div>
+  </div>
+
+  <script>
+    const logs = document.getElementById('logs');
+    const statusEl = document.getElementById('status');
+    const source = new EventSource('/api/events/stream?userId=1&channels=alerts');
+
+    source.onopen = () => {
+      statusEl.textContent = 'Connected';
+      statusEl.style.color = 'green';
+    };
+
+    source.onerror = () => {
+      statusEl.textContent = 'Error/Disconnected';
+      statusEl.style.color = 'red';
+    };
+
+    function appendLog(id, type, data) {
+      const el = document.createElement('div');
+      el.className = 'event';
+      el.innerHTML = `[<span class="event-id">${id || 'none'}</span>] <span class="event-type">${type}</span>: <span class="event-data">${data}</span>`;
+      logs.prepend(el);
+    }
+
+    // Standard message
+    source.onmessage = (event) => { appendLog(event.lastEventId, 'message', event.data); };
+
+    // Custom types
+    const eventTypes = ['SYSTEM_ALERT', 'USER_NOTIFICATION', 'CUSTOM_ALERT'];
+    eventTypes.forEach(type => {
+      source.addEventListener(type, (event) => {
+        appendLog(event.lastEventId, type, event.data);
+      });
+    });
+
+    async function publishEvent() {
+      const channel = document.getElementById('channel').value;
+      const eventType = document.getElementById('eventType').value;
+      const message = document.getElementById('message').value;
+
+      try {
+        await fetch('/api/events/publish', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ channel, eventType, payload: { message } })
+        });
+      } catch (err) {
+        alert('Failed to publish');
+      }
+    }
+  </script>
+</body>
+</html>
